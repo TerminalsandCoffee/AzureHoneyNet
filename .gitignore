@@ -1,0 +1,14 @@
+# Personal interview prep files (not for public repo)
+QUICK_REFERENCE.md
+WHAT_MAKES_THIS_STAND_OUT.md
+
+# Terraform state and variables
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/*.tfvars
+terraform/.terraform/
+
+# OS files
+.DS_Store
+Thumbs.db
+
