@@ -29,6 +29,6 @@ jobs:
 
       - name: Upload SARIF to GitHub Code Scanning
         if: always()  # Run even on scan errors
-        uses: github/codeql-action/upload-sarif@v3-beta  # Dodges deprecation
+        uses: github/codeql-action/upload-sarif@v3 # Dodges deprecation
         with:
           sarif_file: snyk-iac.sarif
