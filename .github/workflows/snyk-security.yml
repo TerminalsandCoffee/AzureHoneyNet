@@ -8,8 +8,8 @@ on:
 
 permissions:
   contents: read
-  security-events: write   # Needed to upload SARIF to GitHub Security tab
-  pull-requests: write     # Optional: lets Snyk comment on PRs
+  security-events: write
+  pull-requests: write
 
 jobs:
   snyk-iac:
@@ -21,13 +21,14 @@ jobs:
         uses: snyk/actions/setup@master
 
       - name: Run Snyk IaC scan & generate SARIF
-        continue-on-error: true   # don't fail CI on findings (change if you want hard fail)
+        continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
-          snyk iac test --sarif --severity-threshold=high > snyk-iac.sarif
+          snyk iac test --file=. --sarif --severity-threshold=high > snyk-iac.sarif
 
       - name: Upload SARIF to GitHub Code Scanning
-        uses: github/codeql-action/upload-sarif@v3
+        if: always()  # Run even on scan errors
+        uses: github/codeql-action/upload-sarif@v3-beta  # Dodges deprecation
         with:
           sarif_file: snyk-iac.sarif
