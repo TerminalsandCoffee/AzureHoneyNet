@@ -1,4 +1,6 @@
-# Building a SOC + Honeynet in Azure (Live Traffic)
+# Original Azure Honeynet Experiment (March 2023)
+
+This record preserves the original observation windows, totals, and diagrams. See the [main README](../README.md) for their interpretation and limitations. The later [Terraform code](../terraform/) does not implement every control pictured here, and the historical results have not been independently recalculated from raw events.
 ![Cloud Honeynet / SOC](https://i.imgur.com/ZWxe03e.jpg)
 
 ## Introduction
@@ -8,8 +10,8 @@ In this project, I build a mini honeynet in Azure and ingest log sources from va
 - SecurityEvent (Windows Event Logs)
 - Syslog (Linux Event Logs)
 - SecurityAlert (Log Analytics Alerts Triggered)
-- SecurityIncident (Incidents created by Sentinel)
-- AzureNetworkAnalytics_CL (Malicious Flows allowed into our honeynet)
+- SecurityIncident (Reported incident-table metric; not verified as a count of distinct incidents)
+- AzureNetworkAnalytics_CL (Reported allowed-flow metric classified as malicious by the lab query)
 
 ## Architecture Before Hardening / Security Controls
 ![Architecture Diagram](https://i.imgur.com/aBDwnKb.jpg)
@@ -50,9 +52,9 @@ Stop Time 2023-03-16 17:04:29
 | SecurityIncident         | 348
 | AzureNetworkAnalytics_CL | 843
 
-## Attack Maps Before Hardening / Security Controls
+## Attack Maps After Hardening / Security Controls
 
-```All map queries actually returned no results due to no instances of malicious activity for the 24 hour period after hardening.```
+The map queries returned no results for the post-change window. This indicates no matching records were reported by those queries; it does not establish that no malicious activity occurred.
 
 ## Metrics After Hardening / Security Controls
 
@@ -68,8 +70,8 @@ Stop Time	2023-03-19 15:37
 | SecurityIncident         | 0
 | AzureNetworkAnalytics_CL | 0
 
-## Conclusion
+## Interpretation
 
-In this project, a mini honeynet was constructed in Microsoft Azure and log sources were integrated into a Log Analytics workspace. Microsoft Sentinel was employed to trigger alerts and create incidents based on the ingested logs. Additionally, metrics were measured in the insecure environment before security controls were applied, and then again after implementing security measures. It is noteworthy that the number of security events and incidents were drastically reduced after the security controls were applied, demonstrating their effectiveness.
+Reported event and incident-table metrics were lower in the second window. This is consistent with reduced exposure after the documented access restrictions. Different traffic volumes, user activity, query filters, and collection health can also affect the counts; multiple controls changed together.
 
-It is worth noting that if the resources within the network were heavily utilized by regular users, it is likely that more security events and alerts may have been generated within the 24-hour period following the implementation of the security controls.
+The original time zone and exact metric-query set are not retained with these totals. Treat them as historical observations rather than evidence of complete protection or a benchmark for another environment. Follow the [lab walkthrough](../LAB_WALKTHROUGH.md) to document a new run with reproducible evidence.

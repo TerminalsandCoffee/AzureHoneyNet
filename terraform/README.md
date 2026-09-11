@@ -1,6 +1,6 @@
 # Terraform Infrastructure as Code
 
-This directory contains Terraform configuration files to deploy the Azure Honeynet infrastructure as code.
+This directory contains Terraform reference code for Azure honeynet infrastructure. Read the [implementation scope and gaps](../MODERNIZATION_GUIDE.md) before following these setup notes. The current configuration has not been validated end to end in this documentation update and does not reproduce every control in the historical experiment.
 
 ## Deployment Workflow
 
@@ -78,9 +78,9 @@ Deploy with `hardened = false` in `terraform.tfvars` to create an intentionally 
 hardened = false
 ```
 
-### Hardened Deployment
+### Restricted Network Mode
 
-After collecting metrics, redeploy with `hardened = true` and your admin IP:
+The `hardened` toggle changes the NSG and Key Vault network ACL settings. It does not create private endpoints, configure host firewalls, or restrict the storage account's public access. Review and validate the configuration before using this mode with an administrator source IP:
 
 ```hcl
 hardened = true

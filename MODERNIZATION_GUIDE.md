@@ -1,116 +1,44 @@
-# Project Modernization Guide
+# Infrastructure Implementation Notes
 
-This document outlines the modernization improvements made to the Azure Honeynet project to make it stand out for your SOC 1 interview.
+The Terraform configuration and deployment helpers were added after the March 2023 experiment. They provide infrastructure reference code; the original measurements are not results from a verified deployment of the current code.
 
-## What's New
+## What the code contains
 
-### 1. **Infrastructure as Code (Terraform)**
-- **Full Terraform deployment** - Deploy entire infrastructure with one command
-- **Version-controlled infrastructure** - Track changes, collaborate, rollback
-- **Reproducible deployments** - Deploy identical environments consistently
-- **Cost-aware configuration** - Optimized VM sizes and resource selection
+| Component | Current implementation |
+| --- | --- |
+| Compute and network | Three VMs with public IPs, a VNet/subnet, and a subnet-associated NSG |
+| NSG access mode | `hardened = false` permits inbound traffic; `true` changes that rule to deny and adds an allow rule when `admin_ip` is set |
+| Key Vault access | `hardened` changes the network ACL default action; the configuration retains the `AzureServices` bypass |
+| Storage | A storage account and diagnostic settings; the code does not disable its public network access |
+| Telemetry | Log Analytics, connector/diagnostic declarations, and legacy VM monitoring-agent configuration |
+| Automation | Bash/PowerShell helpers and GitHub workflow definitions |
 
-**Why This Matters:**
-- Shows DevOps/DevSecOps understanding
-- Demonstrates infrastructure automation skills
-- Professional, production-ready approach
-- Easy to demonstrate in interviews (just run `terraform apply`)
+The `hardened` variable controls specific network settings. It is not a declaration that every resource has been secured or tested.
 
-### 2. **Deployment Automation**
-- **One-command deployment** - `./scripts/deploy.sh` or `./scripts/deploy.ps1`
-- **Prerequisite checking** - Validates Azure CLI, Terraform installation
-- **Interactive confirmation** - Safety checks before deployment
-- **Cross-platform support** - Bash (Linux/Mac) and PowerShell (Windows)
+## Gaps relative to the original experiment
 
-**Why This Matters:**
-- Shows automation mindset
-- Reduces deployment time from hours to minutes
-- Professional tooling approach
-- Easy to demo in interviews
+- Private endpoints and their DNS configuration are not provisioned.
+- VM host-firewall configuration is not automated.
+- Storage public-access restrictions are not implemented by the `hardened` toggle.
+- The code does not configure NSG flow-log collection and Traffic Analytics to reproduce the historical network metric.
+- Rule imports, connector configuration, and event arrival still require verification. The presence of a resource declaration does not establish that the desired logs are collected.
 
-### 3. **CI/CD Pipeline (GitHub Actions)**
-- **Automated validation** - Terraform format and validation checks
-- **Pull request integration** - Automatic checks on PRs
-- **Security scanning** - Validates infrastructure before merge
-- **Professional workflow** - Industry-standard practices
+## Validation status
 
-**Why This Matters:**
-- Shows understanding of modern DevOps practices
-- Demonstrates collaboration skills
-- Industry-standard tooling
-- Shows attention to quality and automation
+The documentation review checked these claims against the source. It did not deploy resources, execute attack simulations, or rerun the historical measurements.
 
-### 4. **Enhanced Documentation**
-- **Comprehensive Terraform README** - Step-by-step deployment guide
-- **Cost optimization guide** - Shows financial awareness
-- **Security best practices** - Production considerations
-- **Troubleshooting section** - Common issues and solutions
+Before treating this code as deployable, validate its schema against the selected AzureRM provider, review the legacy monitoring agents and diagnostic settings against current Azure support, configure the backend, and verify the deployment in a disposable subscription. Resolve validation errors before applying a plan.
 
-### 5. **Professional Project Structure**
-```
-AzureHoneyNet/
-├── terraform/              # Infrastructure as Code
-│   ├── main.tf            # Main infrastructure
-│   ├── variables.tf       # Configurable variables
-│   ├── outputs.tf        # Deployment outputs
-│   └── README.md          # Deployment guide
-├── scripts/               # Automation scripts
-│   ├── deploy.sh          # Linux/Mac deployment
-│   └── deploy.ps1         # Windows deployment
-├── .github/
-│   └── workflows/         # CI/CD pipelines
-└── [existing project files]
-```
----
+The existing CI configuration is also limited: format and plan steps permit failure, and initialization depends on backend setup. A workflow file alone does not establish a successful infrastructure or detection test.
 
-## Comparison: Before vs. After
+## Evidence needed for a maintained lab
 
-| Aspect | Before | After |
-|--------|--------|-------|
-| **Deployment** | Manual Azure Portal clicks | One-command Terraform |
-| **Reproducibility** | Difficult to recreate | Fully reproducible |
-| **Version Control** | No infrastructure tracking | Full Git history |
-| **Automation** | Manual scripts only | CI/CD + deployment automation |
-| **Documentation** | Basic README | Comprehensive guides |
-| **Professionalism** | Good project | **Enterprise-ready project** |
+1. A recorded Terraform/provider version and successful validation output.
+2. A reviewed plan and a successful deployment in an isolated subscription.
+3. Positive and negative access tests for each relevant endpoint.
+4. Confirmed collection from each host and service, with known test events.
+5. Detection tests recording expected alerts, observed alerts, latency, and false positives.
+6. Exact queries and sanitized exports for each reported metric.
+7. A verified teardown and cost record.
 
----
-
-## Additional Ideas (Future)
-
-If you want to take it even further:
-
-1. **Azure Bicep** - Alternative IaC language (Microsoft-native)
-2. **Ansible** - Configuration management for VMs
-3. **Azure DevOps Pipelines** - Alternative CI/CD
-4. **Cost monitoring** - Azure Cost Management integration
-5. **Security scanning** - Checkov or tfsec for Terraform
-6. **Monitoring dashboards** - Azure Monitor workbooks
-7. **Automated testing** - Test infrastructure with Terratest
-8. **Multi-environment** - Dev/Staging/Prod environments
-
----
-
-## Learning Resources
-
-If you want to deepen your Terraform knowledge:
-
-- [Terraform Azure Provider Docs](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs)
-- [Terraform Best Practices](https://www.terraform.io/docs/cloud/guides/recommended-practices/index.html)
-- [Azure Architecture Center](https://docs.microsoft.com/azure/architecture/)
-
----
-
-## Checklist for Interview
-
-- [ ] Can explain what Infrastructure as Code is
-- [ ] Can describe Terraform benefits
-- [ ] Can show the deployment script
-- [ ] Can explain CI/CD workflow
-- [ ] Can discuss cost optimization
-- [ ] Can connect to SOC automation mindset
-
-
-
-
-
+Use the [lab walkthrough](./LAB_WALKTHROUGH.md) to organize the evidence. The [Terraform guide](./terraform/README.md) retains setup details for reference.

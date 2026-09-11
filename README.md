@@ -1,254 +1,92 @@
-# Azure Honeynet & SOC Project
+# Azure Honeynet: Security Controls and Detection
 
-![Cloud Honeynet / SOC](https://i.imgur.com/ZWxe03e.jpg)
+A cloud security lab exploring how network exposure affects observed telemetry in Microsoft Sentinel. It combines a documented Azure honeynet experiment, KQL examples, alert-rule exports, and Terraform reference code.
 
-## Overview
+The central question: **what changes in the logs after restricting access, and what can those changes actually tell us?**
 
-This project demonstrates the implementation of a cloud-based honeynet security operations center (SOC) using Microsoft Azure. The project showcases practical experience with SIEM operations, threat detection, log analysis, and security control implementation in a production-like Azure environment.
+## Start here
 
-**Key Learning Outcomes:**
-- SIEM/SOAR platform configuration (Microsoft Sentinel)
-- Security log ingestion and analysis
-- Custom KQL (Kusto Query Language) query development
-- Security control implementation and effectiveness measurement
-- Threat detection and incident response workflows
+- [Lab walkthrough](./LAB_WALKTHROUGH.md): follow the control change, telemetry, and evidence limitations.
+- [KQL examples](./AzureHoneyNet/KQL-Query-Cheat-Sheet.md): explore authentication, host, and Azure service events.
+- [Analytics rule exports](./AzureHoneyNet/Sentinel-Analytics-Rules/): review queries, thresholds, and mappings before adapting them.
+- [Terraform scope](./MODERNIZATION_GUIDE.md): understand what the later infrastructure code covers and what still needs work.
 
-## Project Summary
+## The experiment
 
-A honeynet infrastructure was deployed in Microsoft Azure with intentionally exposed resources to attract and capture real-world attack traffic. Security logs from multiple sources were ingested into a Log Analytics workspace and analyzed using Microsoft Sentinel. The project measured security metrics before and after implementing security controls, demonstrating the effectiveness of security hardening measures.
+The original March 2023 lab used two Windows VMs and one Linux VM, a virtual network and network security group (NSG), Log Analytics, Microsoft Sentinel, Key Vault, and a storage account.
 
-### Security Metrics Tracked
+The documented initial configuration exposed resources to internet traffic. The later configuration restricted inbound access to the administrator's workstation and applied host/service firewall controls and private endpoints. Two separate 24-hour windows were recorded before and after that change.
 
-- **SecurityEvent** - Windows Event Logs (authentication, failed logins, etc.)
-- **Syslog** - Linux system logs (SSH authentication failures)
-- **SecurityAlert** - Automated alerts triggered by Log Analytics
-- **SecurityIncident** - Incidents created by Microsoft Sentinel
-- **AzureNetworkAnalytics_CL** - Network Security Group logs (malicious traffic flows)
+These are historical observations. The Terraform code added later is a reference implementation and does not establish an exact reproduction of that experiment. In particular, it does not provision private endpoints or configure the VM host firewalls shown in the original write-up.
 
-### SOC Workflow
+### Documented architecture
 
-```mermaid
-graph TD
-    A[Attack Traffic<br/>Internet] --> B[Target VMs<br/>Windows/Linux]
-    B --> C[Security Events<br/>Generated]
-    C --> D[Log Analytics<br/>Workspace]
-    
-    E[Azure Services<br/>Key Vault/Storage] --> D
-    F[Network Security<br/>Group Flow Logs] --> D
-    
-    D --> G[Microsoft Sentinel<br/>SIEM/SOAR]
-    G --> H{KQL Query<br/>Analysis}
-    H -->|Match Pattern| I[Security Alert<br/>Generated]
-    H -->|No Match| D
-    
-    I --> J[Incident Correlation<br/>& Grouping]
-    J --> K[Security Incident<br/>Created]
-    K --> L[SOC Analyst<br/>Triage]
-    L --> M{Severity<br/>Assessment}
-    M -->|High| N[Escalate to<br/>SOC 2/3]
-    M -->|Medium/Low| O[Investigate &<br/>Document]
-    
-    style A fill:#ff6b6b
-    style B fill:#ffaaa5
-    style D fill:#ffe66d
-    style G fill:#a8e6cf
-    style I fill:#ffd3a5
-    style K fill:#ff6b6b
-    style N fill:#c7ceea
-```
+| Before access restrictions | After access restrictions |
+| --- | --- |
+| ![Original exposed lab architecture](https://i.imgur.com/aBDwnKb.jpg) | ![Original hardened lab architecture](https://i.imgur.com/YQNa9Pp.jpg) |
 
-## Architecture
+These diagrams describe the original lab, rather than a verified deployment of the current Terraform configuration.
 
-### Before Security Hardening
-![Architecture Diagram](https://i.imgur.com/aBDwnKb.jpg)
+## Recorded observations
 
-### After Security Hardening
-![Architecture Diagram](https://i.imgur.com/YQNa9Pp.jpg)
+| Window | Start | End |
+| --- | --- | --- |
+| Before | March 15, 2023 17:04:29 | March 16, 2023 17:04:29 |
+| After | March 18, 2023 15:37 | March 19, 2023 15:37 |
 
-### Infrastructure Components
+The original write-up does not state the time zone. Each window spans 24 hours, but the windows are on different days.
 
-The honeynet architecture consists of the following Azure services:
+| Reported metric | Before | After | Interpretation |
+| --- | ---: | ---: | --- |
+| `SecurityEvent` | 19,470 | 8,778 | Reported Windows security-event count; about 54.9% lower. This is not a count of confirmed attacks. |
+| `Syslog` | 3,028 | 25 | Reported Linux syslog count; about 99.2% lower. Exact authentication filters must be retained to classify these records. |
+| `SecurityAlert` | 10 | 0 | No alerts were reported for the second window. This does not measure detection coverage. |
+| `SecurityIncident` | 348 | 0 | Reported incident-table metric. The historical query is not retained with the totals, so 348 should not be presented as 348 distinct incidents. |
+| `AzureNetworkAnalytics_CL` | 843 | 0 | Reported metric for allowed flows classified as malicious by the lab's query; no matches were reported in the second window. |
 
-- **Virtual Network (VNet)** - Network isolation and segmentation
-- **Network Security Group (NSG)** - Network-level access control
-- **Virtual Machines** - 2 Windows VMs, 1 Linux VM (target hosts)
-- **Log Analytics Workspace** - Centralized log collection and storage
-- **Azure Key Vault** - Secrets management and access monitoring
-- **Azure Storage Account** - Blob storage with access logging
-- **Microsoft Sentinel** - SIEM/SOAR platform for threat detection and response
+The totals above are preserved from the [original experiment record](./AzureHoneyNet/README.md). The repository includes map/query artifacts, but not a complete raw event export and exact metric-query set sufficient to independently recalculate every total. This documentation update did not rerun the experiment.
 
-### Architecture Diagram
+### What the results support
 
-```mermaid
-graph TB
-    Internet[Internet<br/>Attack Traffic] -->|Inbound Attacks| NSG[Network Security Group]
-    NSG -->|RDP/SSH/SMB| WinVM1[Windows VM 1]
-    NSG -->|RDP/SSH/SMB| WinVM2[Windows VM 2]
-    NSG -->|SSH| LinuxVM[Linux VM]
-    
-    WinVM1 -->|Security Events| LAW[Log Analytics<br/>Workspace]
-    WinVM2 -->|Security Events| LAW
-    LinuxVM -->|Syslog| LAW
-    
-    KeyVault[Azure Key Vault] -->|Audit Logs| LAW
-    Storage[Storage Account] -->|Access Logs| LAW
-    NSG -->|Flow Logs| LAW
-    
-    LAW -->|Query & Analyze| Sentinel[Microsoft Sentinel<br/>SIEM/SOAR]
-    
-    Sentinel -->|Generate| Alerts[Security Alerts]
-    Sentinel -->|Correlate| Incidents[Security Incidents]
-    
-    Admin[Admin Workstation] -.->|Management| WinVM1
-    Admin -.->|Management| WinVM2
-    Admin -.->|Management| LinuxVM
-    
-    style Internet fill:#ff6b6b
-    style NSG fill:#4ecdc4
-    style WinVM1 fill:#95e1d3
-    style WinVM2 fill:#95e1d3
-    style LinuxVM fill:#95e1d3
-    style LAW fill:#ffe66d
-    style Sentinel fill:#a8e6cf
-    style KeyVault fill:#ffd3a5
-    style Storage fill:#ffd3a5
-    style Alerts fill:#ffaaa5
-    style Incidents fill:#ff6b6b
-    style Admin fill:#c7ceea
-```
+The lower reported counts are consistent with reduced exposure after access restrictions. They are useful observations about this lab and these time windows.
 
-### Security Control Implementation
+They do not establish that all malicious traffic was blocked, that the environment was free of compromise, or that the detections cover every attack. Internet traffic varies, legitimate activity changes event volume, and a broken collection pipeline can also produce fewer records. Multiple controls changed together, so the measurements do not isolate the effect of any one control.
 
-**Initial State (Before Hardening):**
-- All resources exposed to the public internet
-- Network Security Groups configured to allow all inbound traffic
-- Virtual machine firewalls disabled
-- No Private Endpoints configured (public endpoints only)
-- Resources intentionally vulnerable to attract attack traffic
+For incident metrics, distinguish table rows from unique incidents: Sentinel adds a new `SecurityIncident` record when an incident is created or updated. See [Microsoft's incident-metrics guidance](https://learn.microsoft.com/en-us/azure/sentinel/manage-soc-with-incident-metrics).
 
-**Hardened State (After Security Controls):**
-- Network Security Groups configured with deny-all rules except admin workstation
-- Virtual machine firewalls enabled and configured
-- Private Endpoints implemented for Key Vault and Storage Account
-- Zero-trust network access principles applied
+### Historical attack maps
 
-## Attack Visualization & Metrics
+![Allowed flows classified as malicious in the original lab](https://i.imgur.com/1qvswSX.png)
 
-### Attack Maps (Before Security Controls)
+![Linux authentication failures in the original lab](https://i.imgur.com/G1YgZt6.png)
 
-The following visualizations show the geographical distribution of attack traffic captured during the initial 24-hour monitoring period:
+![Windows authentication failures in the original lab](https://i.imgur.com/ESr9Dlv.png)
 
-![NSG Allowed Inbound Malicious Flows](https://i.imgur.com/1qvswSX.png)
-*Network Security Group logs showing malicious traffic flows allowed into the honeynet*
+The original post-change map queries returned no results. That describes query output for the observed window, not the absence of all malicious activity.
 
-![Linux Syslog Auth Failures](https://i.imgur.com/G1YgZt6.png)
-*Geographical distribution of SSH brute force attempts against Linux hosts*
+## Lessons for control validation
 
-![Windows RDP/SMB Auth Failures](https://i.imgur.com/ESr9Dlv.png)
-*Geographical distribution of RDP/SMB authentication failures on Windows hosts*
+- **Test the access boundary.** Verify both the intended administrator path and an unauthorized source after changing network rules.
+- **Verify collection before interpreting a quiet dashboard.** Confirm recent records and expected test events from each required source.
+- **Treat detection content as lab material.** Review query semantics, prerequisites, thresholds, false positives, and ATT&CK mappings before reuse. The exported rules are not validated for another environment simply because they can be imported.
+- **Check public and private access separately.** A private endpoint provides a private path; public endpoint access still needs explicit configuration. See [Azure Storage network security](https://learn.microsoft.com/en-us/azure/storage/common/storage-network-security-overview).
+- **Keep evidence reproducible.** Save configuration changes, exact queries, time zones, filters, collection-health checks, and sanitized results together.
 
-### Security Metrics Comparison
+## Repository contents
 
-#### Before Security Hardening
-**Monitoring Period:** March 15, 2023 17:04:29 - March 16, 2023 17:04:29 (24 hours)
+| Path | Purpose |
+| --- | --- |
+| [AzureHoneyNet/](./AzureHoneyNet/) | Historical experiment record, KQL, maps, and exported rules |
+| [Attack-Scripts/](./AzureHoneyNet/Attack-Scripts/) | Lab scripts for generating test activity; review targets and behavior before running |
+| [Vulnerability-Management/](./AzureHoneyNet/Vulnerability-Management/) | Scripts demonstrating changes to legacy protocol settings |
+| [terraform/](./terraform/) | Later Azure infrastructure reference code |
+| [scripts/](./scripts/) | Terraform deployment helpers |
+| [.github/workflows/](./.github/workflows/) | Terraform validation and scanning workflow definitions |
 
-| Metric                   | Count    | Description
-| ------------------------ | -------- | -----------
-| SecurityEvent            | 19,470   | Windows security events (authentication attempts, failed logins)
-| Syslog                   | 3,028    | Linux system logs (primarily SSH authentication failures)
-| SecurityAlert            | 10       | Automated alerts triggered by Log Analytics rules
-| SecurityIncident         | 348      | Security incidents created by Microsoft Sentinel
-| AzureNetworkAnalytics_CL | 843      | Malicious network flows allowed through NSG rules
+## Working with the infrastructure
 
-#### After Security Hardening
-**Monitoring Period:** March 18, 2023 15:37 - March 19, 2023 15:37 (24 hours)
+Read the [implementation scope and gaps](./MODERNIZATION_GUIDE.md) before using the [Terraform guide](./terraform/README.md). The current code is not an end-to-end validated reconstruction of the historical lab. Workflow definitions and deployment helpers are not evidence of a successful deployment or complete telemetry collection.
 
-| Metric                   | Count | Description
-| ------------------------ | ----- | -----------
-| SecurityEvent            | 8,778 | Windows security events (reduced by 55%)
-| Syslog                   | 25    | Linux system logs (reduced by 99%)
-| SecurityAlert            | 0     | No automated alerts triggered
-| SecurityIncident         | 0     | No security incidents created
-| AzureNetworkAnalytics_CL | 0     | No malicious flows allowed through NSG
+Use an isolated, authorized lab subscription with disposable data and a defined teardown plan. The exposed mode intentionally permits inbound traffic and creates billable resources. Review the configuration and plan before applying changes.
 
-> **Note:** Attack map queries returned no results during the post-hardening period, indicating complete mitigation of malicious inbound traffic.
-
-## Results & Key Findings
-
-### Security Control Effectiveness
-
-The implementation of security controls resulted in a **100% reduction** in security incidents and alerts, demonstrating the critical importance of proper network security configuration:
-
-1. **Zero Security Incidents** - No incidents generated after hardening (down from 348)
-2. **Zero Security Alerts** - All automated alert rules remained inactive (down from 10)
-3. **99% Reduction in Syslog Events** - Linux authentication failures reduced from 3,028 to 25
-4. **55% Reduction in Security Events** - Windows security events reduced from 19,470 to 8,778
-5. **Complete Network Protection** - Zero malicious flows allowed through NSG rules (down from 843)
-
-### Key Takeaways
-
-- **Network Security Groups (NSGs)** are foundational to Azure security - properly configured NSGs completely blocked malicious inbound traffic
-- **Private Endpoints** eliminate public attack surface for critical services
-- **Defense in Depth** - Combining NSGs, host firewalls, and Private Endpoints provides layered security
-- **SIEM Visibility** - Comprehensive logging and monitoring enable accurate security posture measurement
-
-### Project Deliverables
-
-This repository includes:
-
-- **KQL Query Library** - Custom queries for threat detection across Windows, Linux, Azure AD, Key Vault, and Storage Accounts
-- **Sentinel Analytics Rules** - Production-ready alert rules with MITRE ATT&CK mapping
-- **Attack Simulation Scripts** - PowerShell scripts for testing detection capabilities
-- **Visualization Data** - JSON files for geo-mapping attack traffic
-- **Vulnerability Management Scripts** - Tools for managing legacy protocols (SMBv1, TLS 1.0/1.1)
-
----
-
-## Technologies & Skills Demonstrated
-
-- **Cloud Platforms:** Microsoft Azure
-- **SIEM/SOAR:** Microsoft Sentinel
-- **Infrastructure as Code:** Terraform
-- **CI/CD:** GitHub Actions
-- **Query Languages:** KQL (Kusto Query Language)
-- **Security Tools:** Log Analytics, Network Security Groups, Private Endpoints
-- **Operating Systems:** Windows Server, Linux (Ubuntu)
-- **Scripting:** PowerShell, Python, Bash
-- **Security Frameworks:** MITRE ATT&CK
-- **DevOps/DevSecOps:** Infrastructure automation, deployment pipelines
-
-## Additional Resources
-
-- [KQL Query Cheat Sheet](./AzureHoneyNet/KQL-Query-Cheat-Sheet.md) - Comprehensive reference for common security queries
-- [Sentinel Analytics Rules](./AzureHoneyNet/Sentinel-Analytics-Rules/) - Importable alert rule templates
-- [Attack Simulation Scripts](./AzureHoneyNet/Attack-Scripts/) - Tools for testing detection rules
-- [Terraform Infrastructure](./terraform/) - Infrastructure as Code deployment
-- [Deployment Scripts](./scripts/) - Automated deployment automation
-- [Modernization Guide](./MODERNIZATION_GUIDE.md) - Details on project improvements
-
-## Quick Start
-
-### Deploy with Terraform (Recommended)
-
-```bash
-# 1. Configure variables
-cd terraform
-cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars with your values
-
-# 2. Deploy
-terraform init
-terraform plan
-terraform apply
-```
-
-Or use the automated deployment script:
-```bash
-# Linux/Mac
-./scripts/deploy.sh
-
-# Windows
-.\scripts\deploy.ps1
-```
-
-See [terraform/README.md](./terraform/README.md) for detailed deployment instructions.
+For a new run, use the [walkthrough's evidence checklist](./LAB_WALKTHROUGH.md#evidence-for-a-new-run) to record results that another reviewer can assess.
